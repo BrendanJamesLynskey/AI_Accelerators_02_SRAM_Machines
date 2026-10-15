@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Accelerators 02 — SRAM Machines: Wafer-Scale, Compiler-Scheduled and Bulk-Synchronous</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@400;500;600;700&family=Archivo:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,700&family=Share+Tech+Mono:wght@400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #10294a;
+            --bg-card: #143154;
+            --bg-code: #19395f;
+            --text-primary: #eff4f8;
+            --text-secondary: #98b2cd;
+            --accent: #72cf9b;
+            --accent-dim: #72cf9b44;
+            --accent-glow: #72cf9b33;
+            --border: #294f79;
+            --font-display: 'Saira Semi Condensed', sans-serif;
+            --font-mono: 'Share Tech Mono', 'Share Tech Mono', monospace;
+            --font-body: 'Archivo', sans-serif;
+            --max-width: 900px;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hero > * { position: relative; z-index: 1; }
+        .series-label {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+        .hero h1 .accent { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin-bottom: 2rem;
+        }
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+        .tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+            white-space: nowrap;
+        }
+        .pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            max-width: var(--max-width);
+        }
+        .pipeline-step {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .pipeline-arrow { color: var(--accent); font-size: 0.9rem; font-weight: 700; }
+        .slide {
+            min-height: 100vh;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 4rem 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .slide-number {
+            font-family: var(--font-display);
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-dim);
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            line-height: 1.25;
+        }
+        .slide h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .slide p { margin-bottom: 1rem; color: var(--text-secondary); }
+        .slide p strong { color: var(--text-primary); }
+        .slide ul, .slide ol { margin-bottom: 1rem; padding-left: 1.5rem; color: var(--text-secondary); }
+        .slide li { margin-bottom: 0.4rem; }
+        .slide li strong { color: var(--text-primary); }
+        .slide code {
+            font-family: var(--font-mono);
+            font-size: 0.88em;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            color: #d4e0ec;
+        }
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.25rem 0;
+            overflow: hidden;
+        }
+        .code-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(114,207,155,0.08);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .code-block pre { margin: 0; padding: 1rem; overflow-x: auto; }
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #d4e0ec;
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+        .kw { color: #fc9883; }
+        .fn { color: #decffe; }
+        .str { color: #d3edfc; }
+        .cm { color: #98b2cd; font-style: italic; }
+        .num { color: #bde6fe; }
+        .type { color: #fac667; }
+        .dir { color: #fc9883; }
+        .mac { color: #fac667; }
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th {
+            background: var(--bg-code);
+            color: var(--accent);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display);
+            white-space: nowrap;
+        }
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) td { background: rgba(20,49,84,0.5); }
+        .diagram-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-box {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+        }
+        .diagram-box.accent { border-color: var(--accent); color: var(--accent); background: rgba(114,207,155,0.08); }
+        .diagram-box.dim { color: var(--text-secondary); border-color: var(--border); }
+        .diagram-arrow { color: var(--accent); font-size: 1.3rem; font-weight: 700; }
+        .diagram-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-vertical .diagram-arrow { font-size: 1.1rem; }
+        .hierarchy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .hierarchy-level { display: flex; align-items: center; gap: 0.75rem; }
+        .hierarchy-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-align: right;
+        }
+        .hierarchy-items { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+        .hierarchy-item {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .hierarchy-item.accent { border-color: var(--accent); color: var(--accent); background: rgba(114,207,155,0.08); }
+        .diagram-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+        .diagram-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .diagram-panel {
+            padding: 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .diagram-panel.accent-border { border-left: 3px solid var(--accent); }
+        .diagram-panel h4 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+        .diagram-panel p, .diagram-panel ul { font-size: 0.85rem; }
+        .callout {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+        .callout p { margin-bottom: 0; }
+        .callout p + p { margin-top: 0.5rem; }
+        .callout .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+        .contents-list { list-style: none; padding-left: 0; counter-reset: contents; }
+        .contents-list li {
+            counter-increment: contents;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .contents-list li:last-child { border-bottom: none; }
+        .contents-list li::before {
+            content: counter(contents, decimal-leading-zero);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+        .contents-list a { color: var(--text-primary); text-decoration: none; transition: color 0.2s; }
+        .contents-list a:hover { color: var(--accent); }
+        .footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .canvas-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.25rem 0;
+            overflow-x: auto;
+        }
+        .canvas-wrap canvas, .canvas-wrap svg { display: block; margin: 0 auto; max-width: 100%; }
+        .badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: middle;
+            margin-left: 0.3rem;
+        }
+        .badge.ok    { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .badge.warn  { border-color: #fac667; color: #fac667; background: rgba(250,198,103,0.08); }
+        .badge.bad   { border-color: #fc9883; color: #fc9883; background: rgba(252,152,131,0.08); }
+        @media (max-width: 640px) {
+            .slide { padding: 3rem 1rem; min-height: auto; }
+            .slide-number { font-size: 3rem; top: 1.5rem; right: 1rem; }
+            .slide h2 { font-size: 1.5rem; }
+            .diagram-grid.cols-2, .diagram-grid.cols-3 { grid-template-columns: 1fr; }
+            .pipeline { gap: 0.15rem; }
+            .pipeline-step { font-size: 0.6rem; padding: 0.2rem 0.4rem; }
+            .hero h1 { font-size: 1.8rem; }
+            table { font-size: 0.78rem; }
+        }
+        .slide p a, .slide td a, .slide li a, .callout a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+        .slide p a:hover, .slide td a:hover, .slide li a:hover, .callout a:hover { border-bottom-style: solid; }
+        .hero { overflow: hidden; }
+        .diagram-panel { min-width: 0; }
+        .metric-label .katex, .callout-label .katex, .series-label .katex,
+        .metric-label .katex *, .callout-label .katex * { text-transform: none; }
+        .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; }
+        @media (max-width: 640px) { .katex-display { font-size: 0.8em; } }
+        .table-wrap { overflow-x: auto; margin: 1rem 0; }
+        .table-wrap table { min-width: 100%; }
+        .num-table td { font-family: var(--font-mono); font-size: 0.8rem; }
+        .num-table td:first-child { font-family: var(--font-body); }
+        td sup a { font-size: 0.65rem; }
+        .chart-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin: 1.25rem 0; }
+        .chart-wrap svg { display: block; width: 100%; height: auto; }
+        .chart-cap { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.4rem; }
+        .num-strong { color: var(--text-primary); font-weight: 600; }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; margin: 1.25rem 0; }
+        .metric { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1rem; min-width: 0; }
+        .metric-value { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; color: var(--accent); line-height: 1.2; overflow-wrap: anywhere; }
+        .metric-label { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.35rem; }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+<style>:root{font-synthesis-weight:none}
+/* deck-mobile-fix:hero */ .hero{overflow:hidden}@supports (overflow-x:clip){.hero{overflow:visible;overflow-x:clip}}
+/* deck-mobile-fix:phone */ @media (max-width:640px){.diagram-box,.tier-fill,.section-divider>span,.action-btn{white-space:normal;overflow-wrap:anywhere}.diagram-grid>*,.diagram-panel,.diagram-box,.code-block,.callout,.metric,.control-group,.control-row>*,.pipeline-body,.roll-track>*,.tier-fill,.timeline-row>*{min-width:0;max-width:100%}p,li,a,code,td,th,.callout,.diagram-panel{overflow-wrap:break-word}pre{max-width:100%;overflow-x:auto}table{display:block;max-width:100%;overflow-x:auto}.katex-display,.bits,.canvas-wrap,.influence-map-wrapper,.timeline-track,div:has(>.bank-cell){max-width:100%;overflow-x:auto;overflow-y:hidden}select,input,img,video,iframe,.action-btn{max-width:100%}canvas{max-width:100%;height:auto}}
+        /* accel-charts (Okabe-Ito, the site's placement colours) */
+        .chart .grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; }
+        .chart .lbl { fill: var(--text-secondary); font-family: var(--font-mono); font-size: 12px; }
+        .chart .lbl.ax { fill: var(--text-primary); font-size: 12.5px; }
+        .chart .bar { stroke: none; opacity: 0.9; }
+        .s1 { fill: #56b4e9; } .s2 { fill: #e69f00; } .s3 { fill: #009e73; } .s4 { fill: #cc79a7; }
+        @media (max-width: 640px) { .chart .lbl { font-size: 16px; } .chart .lbl.ax { font-size: 16px; } }
+    </style>
+</head>
+<body>
+<header class="hero">
+    <div class="series-label">AI Accelerators &mdash; Presentation 02</div>
+    <h1>SRAM Machines: <span class="accent">Wafers, LPUs and IPUs</span></h1>
+    <p class="subtitle">Put the weights in on-chip SRAM and memory bandwidth stops being the limit. The price is capacity: a whole wafer per few billion parameters, or hundreds of chips in a chain. Cerebras's wafer, Groq's statically scheduled LPU and Graphcore's bulk-synchronous IPU.</p>
+
+    <div class="tags">
+        <span class="tag">Wafer-scale</span>
+        <span class="tag">Yield and spares</span>
+        <span class="tag">Weight streaming</span>
+        <span class="tag">Static schedule</span>
+        <span class="tag">Pipeline chains</span>
+        <span class="tag">Bulk-synchronous</span>
+        <span class="tag">Latency</span>
+    </div>
+
+    <div class="pipeline">
+        <span class="pipeline-step">SRAM bandwidth</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Capacity</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Chips in a chain</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Latency</span>
+    </div>
+</header>
+
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We&rsquo;ll Cover</h2>
+    <ul class="contents-list">
+        <li><a href="#slide-01">Why Put the Weights in SRAM</a></li>
+        <li><a href="#slide-02">A Whole Wafer as One Chip</a></li>
+        <li><a href="#slide-03">Surviving Defects Instead of Avoiding Them</a></li>
+        <li><a href="#slide-04">Models Across Wafers, and Weight Streaming</a></li>
+        <li><a href="#slide-05">Compiler-Scheduled Chips: No Caches, No DRAM</a></li>
+        <li><a href="#slide-06">A Token Down a Chain of Chips</a></li>
+        <li><a href="#slide-07">What the Published Speeds Say</a></li>
+        <li><a href="#slide-08">The IPU: Bulk-Synchronous Tiles</a></li>
+        <li><a href="#slide-09">What to Take Away</a></li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">Live companion and sources</div>
+        <p>This deck follows <a href="https://ai-accelerators-explained.vercel.app/learn/04-wafer-scale">chapter 4, wafer-scale</a>, <a href="https://ai-accelerators-explained.vercel.app/learn/05-compiler-scheduled">chapter 5, compiler-scheduled chips</a> and the IPU part of <a href="https://ai-accelerators-explained.vercel.app/learn/06-reconfigurable-dataflow">chapter 6</a>. Specifications, sources and access dates: <a href="https://ai-accelerators-explained.vercel.app/specs">the specifications page</a>.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>Why Put the Weights in SRAM</h2>
+    <p>A decode step reads every weight once. On a GPU that read comes from HBM; put the weights in on-chip SRAM and the same read is orders of magnitude faster.</p>
+    <div class="metric-grid">
+        <div class="metric"><div class="metric-value">3.35 TB/s</div><div class="metric-label">H100 HBM bandwidth</div></div>
+        <div class="metric"><div class="metric-value">80 TB/s</div><div class="metric-label">one GroqChip&rsquo;s SRAM</div></div>
+        <div class="metric"><div class="metric-value">21 PB/s</div><div class="metric-label">one Cerebras WSE-3&rsquo;s SRAM</div></div>
+    </div>
+    <p>The price is capacity: 230 MB of SRAM per GroqChip and 44 GB per wafer, against 80 GB of HBM on one H100.</p>
+</section>
+
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>A Whole Wafer as One Chip</h2>
+    <p>Cerebras skips the step every other chip takes, cutting the wafer into dies. The WSE-3 keeps 84 dies joined, with its fabric running across the scribe lines.</p>
+    <div class="table-wrap"><table class="num-table"><thead><tr><th></th><th>Cerebras WSE-3 (CS-3)</th><th>Cerebras WSE-3 Turbo (CS-4)</th></tr></thead><tbody>
+<tr><td>Silicon (mm&sup2;)</td><td>46,225 <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/864133620041e5af418074842e42a669c137fa23.pdf" title="Cerebras, &#x27;The World&#x27;s Fastest AI Infrastructure&#x27;: CS-3 and WSE-3 datasheet (PDF; &#x27;FLOPS shown as sparse&#x27;), read 2026-10-15">cs3-datasheet</a></sup></td><td>46,225 <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/bb028ae2422089dfbcc9fd2455c021f3625c7a75.pdf" title="Cerebras, &#x27;Meet CS-4&#x27; datasheet (PDF; &#x27;AI compute shown as sparse FP16&#x27;), read 2026-10-15">cs4-datasheet</a></sup></td></tr>
+<tr><td>Cores</td><td>900,000 <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/864133620041e5af418074842e42a669c137fa23.pdf" title="Cerebras, &#x27;The World&#x27;s Fastest AI Infrastructure&#x27;: CS-3 and WSE-3 datasheet (PDF; &#x27;FLOPS shown as sparse&#x27;), read 2026-10-15">cs3-datasheet</a></sup></td><td>900,000 <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/bb028ae2422089dfbcc9fd2455c021f3625c7a75.pdf" title="Cerebras, &#x27;Meet CS-4&#x27; datasheet (PDF; &#x27;AI compute shown as sparse FP16&#x27;), read 2026-10-15">cs4-datasheet</a></sup></td></tr>
+<tr><td>On-chip SRAM</td><td>44 GB <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/864133620041e5af418074842e42a669c137fa23.pdf" title="Cerebras, &#x27;The World&#x27;s Fastest AI Infrastructure&#x27;: CS-3 and WSE-3 datasheet (PDF; &#x27;FLOPS shown as sparse&#x27;), read 2026-10-15">cs3-datasheet</a></sup></td><td>44 GB <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/bb028ae2422089dfbcc9fd2455c021f3625c7a75.pdf" title="Cerebras, &#x27;Meet CS-4&#x27; datasheet (PDF; &#x27;AI compute shown as sparse FP16&#x27;), read 2026-10-15">cs4-datasheet</a></sup></td></tr>
+<tr><td>SRAM bandwidth</td><td>21 PB/s <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/864133620041e5af418074842e42a669c137fa23.pdf" title="Cerebras, &#x27;The World&#x27;s Fastest AI Infrastructure&#x27;: CS-3 and WSE-3 datasheet (PDF; &#x27;FLOPS shown as sparse&#x27;), read 2026-10-15">cs3-datasheet</a></sup></td><td>43.2 PB/s <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/bb028ae2422089dfbcc9fd2455c021f3625c7a75.pdf" title="Cerebras, &#x27;Meet CS-4&#x27; datasheet (PDF; &#x27;AI compute shown as sparse FP16&#x27;), read 2026-10-15">cs4-datasheet</a></sup></td></tr>
+<tr><td>FP16 (sparse; dense not given)</td><td>125 PFLOP/s <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/864133620041e5af418074842e42a669c137fa23.pdf" title="Cerebras, &#x27;The World&#x27;s Fastest AI Infrastructure&#x27;: CS-3 and WSE-3 datasheet (PDF; &#x27;FLOPS shown as sparse&#x27;), read 2026-10-15">cs3-datasheet</a></sup></td><td>250 PFLOP/s <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/bb028ae2422089dfbcc9fd2455c021f3625c7a75.pdf" title="Cerebras, &#x27;Meet CS-4&#x27; datasheet (PDF; &#x27;AI compute shown as sparse FP16&#x27;), read 2026-10-15">cs4-datasheet</a></sup></td></tr>
+<tr><td>System I/O</td><td>1.2 Tb/s <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/864133620041e5af418074842e42a669c137fa23.pdf" title="Cerebras, &#x27;The World&#x27;s Fastest AI Infrastructure&#x27;: CS-3 and WSE-3 datasheet (PDF; &#x27;FLOPS shown as sparse&#x27;), read 2026-10-15">cs3-datasheet</a></sup></td><td>2.4 Tb/s <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/bb028ae2422089dfbcc9fd2455c021f3625c7a75.pdf" title="Cerebras, &#x27;Meet CS-4&#x27; datasheet (PDF; &#x27;AI compute shown as sparse FP16&#x27;), read 2026-10-15">cs4-datasheet</a></sup></td></tr>
+<tr><td>System power</td><td>27 kW <sup><a href="https://cdn.sanity.io/files/e4qjo92p/production/864133620041e5af418074842e42a669c137fa23.pdf" title="Cerebras, &#x27;The World&#x27;s Fastest AI Infrastructure&#x27;: CS-3 and WSE-3 datasheet (PDF; &#x27;FLOPS shown as sparse&#x27;), read 2026-10-15">cs3-datasheet</a></sup></td><td>not disclosed</td></tr>
+</tbody></table></div>
+    <div class="callout"><div class="callout-label">Announced</div><p>The CS-4&rsquo;s WSE-3 Turbo is announced, with first shipments &ldquo;this quarter&rdquo; on the access date. Cerebras gives compute only as a sparse FP16 figure; a compute term from it is a floor.</p></div>
+</section>
+
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>Surviving Defects Instead of Avoiding Them</h2>
+    $$\lambda = D_0 \cdot A, \qquad Y_{\text{perfect}} = e^{-\lambda}$$
+    <p>Defects land at random, a density \(D_0\) per unit area. At an illustrative \(D_0\) = 0.1 per cm&sup2; (TSMC publishes none for N5):</p>
+    <div class="metric-grid">
+        <div class="metric"><div class="metric-value">44%</div><div class="metric-label">yield of an 814&nbsp;mm&sup2; die that must be perfect</div></div>
+        <div class="metric"><div class="metric-value">46.2</div><div class="metric-label">defects expected on the wafer</div></div>
+        <div class="metric"><div class="metric-value">292</div><div class="metric-label">spares per expected defect (1.5% spare cores, illustrative)</div></div>
+    </div>
+    <p>A perfect wafer is essentially impossible. Cerebras makes defects small and survivable instead: each core is about 38,000&nbsp;&micro;m&sup2;, so a defect costs one core of 900,000, and &ldquo;redundant compute cores, redundant routing, and a fail-in-place architecture&rdquo; route round it.</p>
+</section>
+
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>Models Across Wafers, and Weight Streaming</h2>
+    <p>Llama 3.1 70B in 16 bits with its KV cache is 141 GB: 4 wafers, cut at layer boundaries. Cerebras&rsquo;s inference service says exactly that: &ldquo;70B models fit on as few as four systems&rdquo;.</p>
+    <p>For training Cerebras streams the weights in from an external memory unit, one layer at a time, each applied to a whole batch held on the wafer. That suits training&rsquo;s huge batches, not one user&rsquo;s decode: streaming the 70B weights once over a CS-3&rsquo;s 1.2 Tb/s of I/O takes 927 ms.</p>
+</section>
+
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>Compiler-Scheduled Chips: No Caches, No DRAM</h2>
+    <p>Groq&rsquo;s first LPU, the GroqChip, removes the last things a chip decides for itself. Its compiler fixes every instruction, memory read and chip-to-chip transfer to a cycle before the program runs (&ldquo;statically scheduled, deterministic execution&rdquo;, ISCA 2022): no cache misses, no arbitration, the same latency every time.</p>
+    <div class="table-wrap"><table class="num-table"><thead><tr><th></th><th>GroqChip (first-generation LPU)</th><th>NVIDIA Groq 3 LPU (LPX rack)</th></tr></thead><tbody>
+<tr><td>SRAM</td><td>230 MB <sup><a href="https://web.archive.org/web/20250615145238/https://groq.com/wp-content/uploads/2022/10/GroqChip%E2%84%A2-Processor-Product-Brief-v1.5.pdf" title="Groq, GroqChip Processor Product Brief v1.5 (2022; Internet Archive copy of groq.com), read 2026-10-15">groqchip-brief</a></sup></td><td>500 MB <sup><a href="https://www.nvidia.com/en-us/data-center/lpx/" title="NVIDIA Groq 3 LPX product page (LPU accelerator and rack), read 2026-10-15">lpx-page</a></sup></td></tr>
+<tr><td>SRAM bandwidth</td><td>80 TB/s <sup><a href="https://web.archive.org/web/20250615145238/https://groq.com/wp-content/uploads/2022/10/GroqChip%E2%84%A2-Processor-Product-Brief-v1.5.pdf" title="Groq, GroqChip Processor Product Brief v1.5 (2022; Internet Archive copy of groq.com), read 2026-10-15">groqchip-brief</a></sup></td><td>150 TB/s <sup><a href="https://www.nvidia.com/en-us/data-center/lpx/" title="NVIDIA Groq 3 LPX product page (LPU accelerator and rack), read 2026-10-15">lpx-page</a></sup></td></tr>
+<tr><td>INT8 dense</td><td>750 TOP/s <sup><a href="https://web.archive.org/web/20250615145238/https://groq.com/wp-content/uploads/2022/10/GroqChip%E2%84%A2-Processor-Product-Brief-v1.5.pdf" title="Groq, GroqChip Processor Product Brief v1.5 (2022; Internet Archive copy of groq.com), read 2026-10-15">groqchip-brief</a></sup></td><td>not disclosed</td></tr>
+<tr><td>FP8</td><td>not disclosed</td><td>1.23 PFLOP/s <sup><a href="https://groq.com/" title="Groq home page, LPX rack figures (&#x27;When released, each NVIDIA Groq 3 LPX rack connects 256 next-generation LPU accelerators&#x27;), read 2026-10-15">groq-home</a></sup></td></tr>
+<tr><td>Chip-to-chip (both ways)</td><td>400 GB/s <sup><a href="https://web.archive.org/web/20250612160012/https://groq.com/wp-content/uploads/2024/02/GroqISCAPaper2022_ASoftwareDefinedTensorStreamingMultiprocessorForLargeScaleMachineLearning-1.pdf" title="Abts et al., &#x27;A Software-defined Tensor Streaming Multiprocessor for Large-scale Machine Learning&#x27;, ISCA 2022 (Groq&#x27;s copy, Internet Archive), read 2026-10-15">groq-isca22</a></sup></td><td>2.5 TB/s <sup><a href="https://www.nvidia.com/en-us/data-center/lpx/" title="NVIDIA Groq 3 LPX product page (LPU accelerator and rack), read 2026-10-15">lpx-page</a></sup></td></tr>
+<tr><td>Hop latency</td><td>722 ns <sup><a href="https://web.archive.org/web/20250612160012/https://groq.com/wp-content/uploads/2024/02/GroqISCAPaper2022_ASoftwareDefinedTensorStreamingMultiprocessorForLargeScaleMachineLearning-1.pdf" title="Abts et al., &#x27;A Software-defined Tensor Streaming Multiprocessor for Large-scale Machine Learning&#x27;, ISCA 2022 (Groq&#x27;s copy, Internet Archive), read 2026-10-15">groq-isca22</a></sup></td><td>not disclosed</td></tr>
+<tr><td>Power</td><td>215 W <sup><a href="https://web.archive.org/web/20250615145238/https://groq.com/wp-content/uploads/2022/10/GroqChip%E2%84%A2-Processor-Product-Brief-v1.5.pdf" title="Groq, GroqChip Processor Product Brief v1.5 (2022; Internet Archive copy of groq.com), read 2026-10-15">groqchip-brief</a></sup></td><td>not disclosed</td></tr>
+</tbody></table></div>
+    <div class="callout"><div class="callout-label">Status</div><p>The GroqChip is retired (kept because published results used it); NVIDIA&rsquo;s Groq 3 LPU is announced (&ldquo;When released&rdquo;), its hop latency not disclosed.</p></div>
+</section>
+
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>A Token Down a Chain of Chips</h2>
+    $$t_{\text{token}} = \frac{W}{g\,\beta_{\text{SRAM}}} + \big((S-1) + 2L\,[g>1]\big)\,t_{\text{hop}}$$
+    <p>The model is cut into \(S\) stages of \(g\) chips; a token runs down the chain. Groq&rsquo;s 2023 Llama 2 70B demonstration used 576 GroqChips in nodes of 8 (the fewest that hold it in INT8: 301).</p>
+    <div class="metric-grid">
+        <div class="metric"><div class="metric-value">108&nbsp;&micro;s</div><div class="metric-label">SRAM reads for one token</div></div>
+        <div class="metric"><div class="metric-value">167&nbsp;&micro;s</div><div class="metric-label">hops at 722 ns each</div></div>
+        <div class="metric"><div class="metric-value">3,640</div><div class="metric-label">tokens/s, one user, at the bound</div></div>
+    </div>
+    <p>More chips per stage divide the reading time but add an all-reduce hop per layer; more stages add hand-on hops. The latency is paid in hops, not bandwidth.</p>
+</section>
+
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>What the Published Speeds Say</h2>
+    <div class="table-wrap"><table class="num-table"><thead><tr><th>Check</th><th>Kind</th><th>Published</th><th>Model</th><th>Ratio</th><th>Source</th></tr></thead><tbody>
+<tr><td>Llama 3.1 70B, 16-bit: CS-3 systems needed</td><td>capacity</td><td>4</td><td>4</td><td>1</td><td><a href="https://www.cerebras.ai/blog/introducing-cerebras-inference-ai-at-instant-speed" title="Cerebras blog, &#x27;Introducing Cerebras Inference: AI at Instant Speed&#x27; (August 2024), read 2026-10-15">cerebras-inference</a></td></tr>
+<tr><td>Llama 2 70B, INT8: GroqChips used vs the fewest that hold it</td><td>capacity</td><td>576</td><td>301</td><td>1.91</td><td><a href="https://www.nextplatform.com/2023/11/27/groq-says-it-can-deploy-1-million-ai-inference-chips-in-two-years/" title="The Next Platform, &#x27;Groq Says It Can Deploy 1 Million AI Inference Chips In Two Years&#x27; (2023-11-27): Groq&#x27;s Llama 2 70B demonstration, read 2026-10-15">nextplatform-groq</a></td></tr>
+<tr><td>576 GroqChips, Llama 2 70B: tokens/s per user vs the bound</td><td>latency</td><td>300</td><td>3,644</td><td>0.0823</td><td><a href="https://www.nextplatform.com/2023/11/27/groq-says-it-can-deploy-1-million-ai-inference-chips-in-two-years/" title="The Next Platform, &#x27;Groq Says It Can Deploy 1 Million AI Inference Chips In Two Years&#x27; (2023-11-27): Groq&#x27;s Llama 2 70B demonstration, read 2026-10-15">nextplatform-groq</a></td></tr>
+<tr><td>4x CS-3, Llama 3.1 70B: tokens/s per user vs the bound</td><td>latency</td><td>450</td><td>150,700</td><td>0.00299</td><td><a href="https://www.cerebras.ai/blog/introducing-cerebras-inference-ai-at-instant-speed" title="Cerebras blog, &#x27;Introducing Cerebras Inference: AI at Instant Speed&#x27; (August 2024), read 2026-10-15">cerebras-inference</a></td></tr>
+<tr><td>1x CS-3, Llama 3.1 8B: tokens/s per user vs the bound</td><td>latency</td><td>1,800</td><td>1,387,000</td><td>0.0013</td><td><a href="https://www.cerebras.ai/blog/introducing-cerebras-inference-ai-at-instant-speed" title="Cerebras blog, &#x27;Introducing Cerebras Inference: AI at Instant Speed&#x27; (August 2024), read 2026-10-15">cerebras-inference</a></td></tr>
+</tbody></table></div>
+    <p>The chip counts match. The speeds do not: the SRAM designs&rsquo; published speeds for one user are 0.13% to 8.2% of the bandwidth bound. Once the weights are in SRAM, bandwidth is not the limit; the published speeds imply 17.3&nbsp;&micro;s to 38.2&nbsp;&micro;s per layer beyond the bound, which the sources do not break down. Even so, these are the fastest one-user speeds in the site&rsquo;s sources (450 tokens/s for 70B on four CS-3s).</p>
+</section>
+
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>The IPU: Bulk-Synchronous Tiles</h2>
+    <p>Graphcore&rsquo;s first-generation IPU (GC2) has 1,216 tiles, each a core with 262 kB of its own SRAM, 319 MB in all at 45 TB/s, and no other memory on the device. It runs the <strong>bulk-synchronous parallel</strong> model:</p>
+    $$t_{\text{superstep}} = \max_{\text{tiles}} t_{\text{compute}} + t_{\text{sync}} + t_{\text{exchange}}$$
+    <div class="diagram-grid cols-3">
+        <div class="diagram-panel accent-border"><h4>Compute</h4><p>Every tile works on its own memory only.</p></div>
+        <div class="diagram-panel accent-border"><h4>Sync</h4><p>All tiles stop at a barrier.</p></div>
+        <div class="diagram-panel accent-border"><h4>Exchange</h4><p>Data moves between tiles on a schedule the compiler fixed.</p></div>
+    </div>
+    <p>Like an LPU chain, a model must fit in the tiles: Llama 3.1 70B in 16 bits needs 444 GC2s. Graphcore&rsquo;s site lists no IPU products on the access date; the part is marked retired.</p>
+</section>
+
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>What to Take Away</h2>
+    <ul>
+        <li>SRAM removes the memory-bandwidth wall for one user and replaces it with a capacity wall: tens to hundreds of chips, or several wafers, per large model.</li>
+        <li>Wafer-scale works by making defects small and routing round them, not by avoiding them.</li>
+        <li>A static schedule buys determinism: every token takes the same time; the cost is a chain of chips and hop latency.</li>
+        <li>The bandwidth bound is far from the published speeds for these designs; per-layer latency, which vendors do not break down, is what limits one user.</li>
+    </ul>
+    <p>Previous: <a href="https://brendanjameslynskey.github.io/AI_Accelerators_01_The_Design_Space/">deck 01, the design space</a>. Next: <a href="https://brendanjameslynskey.github.io/AI_Accelerators_03_Dataflow_Meshes_Edge_In_Memory/">deck 03, dataflow, meshes, edge and in-memory</a>.</p>
+</section>
+
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_AI_Accelerators">AI Accelerators series</a> &middot; live, animated companion: <a href="https://ai-accelerators-explained.vercel.app/learn/04-wafer-scale">chapter 4, Wafer-scale</a> &middot; <a href="https://ai-accelerators-explained.vercel.app/learn/05-compiler-scheduled">chapter 5, Compiler-scheduled chips</a> &middot; <a href="https://ai-accelerators-explained.vercel.app/learn/06-reconfigurable-dataflow">chapter 6, Reconfigurable dataflow</a> of <a href="https://ai-accelerators-explained.vercel.app">AI Accelerators Explained</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://brendanjameslynskey.github.io/AI_Accelerators_01_The_Design_Space/">&larr; 01 The Design Space</a> &nbsp;&middot;&nbsp; <a href="https://brendanjameslynskey.github.io/LLM_Hub_AI_Accelerators/">Series index</a> &nbsp;&middot;&nbsp; <a href="https://brendanjameslynskey.github.io/AI_Accelerators_03_Dataflow_Meshes_Edge_In_Memory/">03 Dataflow to In-Memory &rarr;</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.75rem;">Every number on these slides is computed by the site&rsquo;s accelerator model (ai-accelerators-explained @04fe2bb, the same values as its <a href="https://github.com/BrendanJamesLynskey/ai-accelerators-explained/blob/main/results.md">results.md</a>); every specification&rsquo;s source and access date (2026-10-15): <a href="https://ai-accelerators-explained.vercel.app/specs">the specifications</a>.</p>
+</footer>
+<script>
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.slide').forEach(slide => {
+        slide.style.opacity = '0';
+        slide.style.transform = 'translateY(30px)';
+        slide.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(slide);
+    });
+</script>
+</body>
+</html>
